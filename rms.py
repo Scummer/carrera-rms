@@ -42,7 +42,7 @@ from PyQt5.QtGui import (
 
 from carreralib import ControlUnit
 
-import sys, copy
+import sys
 
 def posgetter(driver):
     return (-driver.lapcount, driver.time)

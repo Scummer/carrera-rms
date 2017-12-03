@@ -131,16 +131,19 @@ class Rms(QMainWindow):
         super().__init__()
 
         self.shutdown = False
-        self.btDialog = BtSelect()
-        self.discoverCU()
-        self.btDialog.scanBtn.clicked.connect(self.discoverCU)
-        if self.btDialog.exec_():
-            if self.discoverBtDevice.isActive():
-                self.discoverBtDevice.stop()
-            BTdevice = self.btDialog.btList.selectedItems()
-            self.startRMS(BTdevice[0].text().split(' -> ')[1])
+        if len(sys.argv) == 2:
+            self.startRMS(sys.argv[1])
         else:
-            sys.exit()
+            self.btDialog = BtSelect()
+            self.discoverCU()
+            self.btDialog.scanBtn.clicked.connect(self.discoverCU)
+            if self.btDialog.exec_():
+                if self.discoverBtDevice.isActive():
+                    self.discoverBtDevice.stop()
+                BTdevice = self.btDialog.btList.selectedItems()
+                self.startRMS(BTdevice[0].text().split(' -> ')[1])
+            else:
+                sys.exit()
 
     def closeEvent(self, event):
         self.shutdown = True

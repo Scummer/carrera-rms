@@ -34,9 +34,13 @@ from PyQt5.QtCore import (
      Qt
 )
 
-from PyQt5.QtBluetooth import (
-     QBluetoothDeviceDiscoveryAgent
-)
+try:
+    from PyQt5.QtBluetooth import (
+         QBluetoothDeviceDiscoveryAgent
+    )
+except ImportError:
+    QBluetoothDeviceDiscoveryAgent = None
+
 
 from PyQt5.QtGui import (
      QKeySequence,
@@ -73,16 +77,23 @@ class BtSelect(QDialog):
 
     def initUI(self):
         self.vLayout = QVBoxLayout(self)
-        self.btList = QListWidget()
-        self.vLayout.addWidget(self.btList)
         self.hBtnLayout = QHBoxLayout()
-        self.vLayout.addLayout(self.hBtnLayout)
-        self.scanBtn = QPushButton('Scan')
-        self.hBtnLayout.addWidget(self.scanBtn)
+        if QBluetoothDeviceDiscoveryAgent != None:
+            self.btList = QListWidget()
+            self.vLayout.addWidget(self.btList)
+            self.scanBtn = QPushButton('Scan')
+            self.hBtnLayout.addWidget(self.scanBtn)
+        else:
+            self.cuAddressInput = QLineEdit()
+            self.hCuAddressLayout = QHBoxLayout()
+            self.hCuAddressLayout.addWidget(QLabel('CU BT Address'))
+            self.hCuAddressLayout.addWidget(self.cuAddressInput)
+            self.vLayout.addLayout(self.hCuAddressLayout)
         self.connectBtn = QPushButton('Connect')
         self.hBtnLayout.addWidget(self.connectBtn)
         self.rejectBtn = QPushButton('Cancel')
         self.hBtnLayout.addWidget(self.rejectBtn)
+        self.vLayout.addLayout(self.hBtnLayout)
         self.connectBtn.clicked.connect(self.accept)
         self.rejectBtn.clicked.connect(self.reject)
 
@@ -135,13 +146,18 @@ class Rms(QMainWindow):
             self.startRMS(sys.argv[1])
         else:
             self.btDialog = BtSelect()
-            self.discoverCU()
-            self.btDialog.scanBtn.clicked.connect(self.discoverCU)
+            if QBluetoothDeviceDiscoveryAgent != None:
+                self.discoverCU()
+                self.btDialog.scanBtn.clicked.connect(self.discoverCU)
             if self.btDialog.exec_():
-                if self.discoverBtDevice.isActive():
-                    self.discoverBtDevice.stop()
-                BTdevice = self.btDialog.btList.selectedItems()
-                self.startRMS(BTdevice[0].text().split(' -> ')[1])
+                if QBluetoothDeviceDiscoveryAgent != None:
+                    if self.discoverBtDevice.isActive():
+                        self.discoverBtDevice.stop()
+                    BTdevice = self.btDialog.btList.selectedItems()
+                    self.cuaddress = BTdevice[0].text().split(' -> ')[1]
+                else:
+                    self.cuaddress = self.btDialog.cuAddressInput.text()
+                self.startRMS(self.cuaddress)
             else:
                 sys.exit()
 
@@ -734,13 +750,20 @@ class StartRankDialog(QDialog):
     def __init__(self, driverArr):
         super().__init__()
         self.driverArr = driverArr
+        self.setWindowTitle('Starting Grid')
         self.setupUI()
 
     def setupUI(self):
         self.vlayout = QVBoxLayout(self)
         self.vlayout.addWidget(QLabel('Starting Grid'))
-        for pos, driver in enumerate(sorted(self.driverArr, key = lambda x: (x.bestLapTime is None, x.bestLapTime)), start = 1):
-            self.vlayout.addWidget(QLabel(str(pos) + ' ' + driver.name + ' ' + formattime(driver.bestLapTime)))
+        self.table = QTableWidget(len(self.driverArr),3)
+        self.vlayout.addWidget(self.table)
+        self.table.verticalHeader().hide()
+        self.table.setHorizontalHeaderLabels(['Grid Position', 'Driver', 'Best Lap'])
+        for idx, driver in enumerate(sorted(self.driverArr, key = lambda x: (x.bestLapTime is None, x.bestLapTime))):
+            self.table.setItem(idx,0, QTableWidgetItem(str(idx + 1)))
+            self.table.setItem(idx,1, QTableWidgetItem(driver.name))
+            self.table.setItem(idx,2, QTableWidgetItem(formattime(driver.bestLapTime)))
         self.okBtn = QPushButton('Ok')
         self.vlayout.addWidget(self.okBtn)
         self.okBtn.clicked.connect(self.accept)
@@ -755,7 +778,7 @@ class LBDialog(QTabWidget):
 
     def setupUI(self):
         for session in sorted(self.leaderboard.keys()):
-            self.table = QTableWidget(6,6)
+            self.table = QTableWidget(len(self.leaderboard[session]),6)
             self.table.verticalHeader().hide()
             self.tabWidget = QWidget()
             self.okBtn = QPushButton('Ok')

@@ -1,0 +1,30 @@
+How to get the rms.py to run:
+
+This is based on a Ubuntu Distribution
+
+Install all the dependencies:
+
+1. apt-get install libglib2.0-dev
+2. apt-get install python3-pip
+3. pip3 install carreralib
+4. pip3 install setuptools
+5. pip3 install bluepy
+6. pip3 install pyqt5
+
+
+Starting the Application:
+
+Get the CU BT Address with the command:
+prompt> hcitool lescan
+
+
+Start the RMS with the CU Address as a command line option:
+prompt> python3 rms.py <CU BT Address>
+
+or
+
+prompt> python3 rms.py
+and input the CU BT Address in the Window that pops up
+or select the CU with a mouse Click in case QtBluetooth is working properly
+
+Happy Slotting

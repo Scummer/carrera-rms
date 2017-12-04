@@ -117,8 +117,8 @@ class StartLight(QWidget):
         painter.drawEllipse(0,0, self.width(), self.height())
 
 class StartLights(QWidget):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent = None):
+        super().__init__(parent)
         hbox = QHBoxLayout(self)
         self.lightOne = StartLight()
         self.lightTwo = StartLight()
@@ -130,8 +130,7 @@ class StartLights(QWidget):
         hbox.addWidget(self.lightThree)
         hbox.addWidget(self.lightFour)
         hbox.addWidget(self.lightFive)
-        self.setWindowFlags(Qt.FramelessWindowHint)
-        self.setWindowModality(Qt.ApplicationModal)
+        self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
         lightsPal = self.palette()
         lightsPal.setColor(lightsPal.Background, Qt.black)
         self.setPalette(lightsPal)
@@ -193,7 +192,7 @@ class Rms(QMainWindow):
 
     def initUI(self):
         self.startLights = StartLights()
-        rectDesktop = app.desktop().screenGeometry()
+        rectDesktop = app.desktop().availableGeometry()
         self.startLights.resize(rectDesktop.width()/2, (rectDesktop.width()/2)/5)
         self.setWindowTitle('Race Management System V1.0')
         self.rmsframe = RmsFrame(self.cu)

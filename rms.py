@@ -1,5 +1,7 @@
 """ Carrera(R) Digital 124/132 race management system based on carreralib"""
 """ Copyright 2017 Thomas Reich thomas@geekazoids.net """
+""" V1.0 Initial release """
+""" V1.0.1 Formatting of display, outputs and other display improvements """
 
 from PyQt5.QtWidgets import (
      QApplication,
@@ -31,6 +33,9 @@ from PyQt5.QtCore import (
      QTimer,
      QTime,
      QObject,
+     QByteArray,
+     pyqtProperty,
+     QPropertyAnimation,
      Qt
 )
 
@@ -46,6 +51,7 @@ from PyQt5.QtGui import (
      QKeySequence,
      QFont,
      QPainter,
+     QPalette,
      QColor
 )
 
@@ -72,7 +78,7 @@ def formattime(time, longfmt=False):
 class BtSelect(QDialog):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Select Carrera AppConnect Device')
+        self.setWindowTitle('Connect to Control Unit')
         self.initUI()
 
     def initUI(self):
@@ -86,7 +92,7 @@ class BtSelect(QDialog):
         else:
             self.cuAddressInput = QLineEdit()
             self.hCuAddressLayout = QHBoxLayout()
-            self.hCuAddressLayout.addWidget(QLabel('CU BT Address'))
+            self.hCuAddressLayout.addWidget(QLabel('Enter CU BT address or USB device'))
             self.hCuAddressLayout.addWidget(self.cuAddressInput)
             self.vLayout.addLayout(self.hCuAddressLayout)
         self.connectBtn = QPushButton('Connect')
@@ -188,13 +194,14 @@ class Rms(QMainWindow):
 
     def startRMS(self, device):
         self.cu = ControlUnit(device, timeout = 1.0)
+        self.cuVersion = self.cu.version()
         self.initUI()
 
     def initUI(self):
         self.startLights = StartLights()
         rectDesktop = app.desktop().availableGeometry()
         self.startLights.resize(rectDesktop.width()/2, (rectDesktop.width()/2)/5)
-        self.setWindowTitle('Race Management System V1.0')
+        self.setWindowTitle('Race Management System V1.0   CU Version:' + str(self.cuVersion, 'utf-8'))
         self.rmsframe = RmsFrame(self.cu)
         self.startLights.spacekey.activated.connect(self.rmsframe.racestart)
         self.setCentralWidget(self.rmsframe)
@@ -251,7 +258,8 @@ class Rms(QMainWindow):
             if pit and not driver.pit:
                 driver.pitcount += 1
             driver.pit = pit
-        self.rmsframe.updateDisplay()
+        self.binmode = "{0:04b}".format(status.mode)
+        self.rmsframe.updateDisplay(self.binmode)
         self.status = status
 
     def handle_timer(self, timer):
@@ -259,7 +267,7 @@ class Rms(QMainWindow):
         driver.newlap(timer)
         if self.rmsframe.start is None:
             self.rmsframe.start = timer.timestamp
-        self.rmsframe.updateDisplay()
+        self.rmsframe.updateDisplay(None)
 
 class CtrlDialog(QDialog):
     def __init__(self, driverArr):
@@ -435,6 +443,14 @@ class RmsFrame(QFrame):
         self.bestlaptime = {}
         self.fuelbar = {}
         self.pits = {}
+        QBAcolor = QByteArray()
+        QBAcolor.append('color')
+        self.animation = anim = QPropertyAnimation(self, QBAcolor, self)
+        anim.setDuration(250)
+        anim.setLoopCount(2)
+        anim.setStartValue(QColor(230,230, 0))
+        anim.setEndValue(QColor(0, 0, 0))
+        anim.setKeyValueAt(0.5, QColor(150,100,0))
 
     def buildframe(self):
         self.vLayout = QVBoxLayout(self)
@@ -495,7 +511,27 @@ class RmsFrame(QFrame):
         self.startRaceBtn.clicked.connect(self.racestart)
         self.spacekey = QShortcut(QKeySequence("Space"), self)
         self.spacekey.activated.connect(self.racestart)
-        self.vLayout.addWidget(self.startRaceBtn)
+        self.hStartBtnLayout = QHBoxLayout()
+        self.hStartBtnLayout.addStretch(1)
+        self.hStartBtnLayout.addWidget(self.startRaceBtn)
+        self.hStartBtnLayout.setAlignment(self.startRaceBtn, Qt.AlignHCenter)
+        self.hStartBtnLayout.addStretch(1)
+        self.pitLaneStatus = QLabel()
+        self.hStartBtnLayout.addWidget(QLabel('Pitlane'))
+        self.hStartBtnLayout.addWidget(self.pitLaneStatus)
+        self.fuelmode = QLabel()
+        self.hStartBtnLayout.addWidget(QLabel('Fuel Mode'))
+        self.hStartBtnLayout.addWidget(self.fuelmode)
+        self.lapCounter = QLabel()
+        self.hStartBtnLayout.addWidget(QLabel('Lap Counter'))
+        self.hStartBtnLayout.addWidget(self.lapCounter)
+        self.vLayout.addLayout(self.hStartBtnLayout)
+        self.vLayout.setAlignment(self.hStartBtnLayout, Qt.AlignTop)
+#        self.sepline = QFrame()
+#        self.sepline.setFrameShape(QFrame.HLine)
+#        self.sepline.setFrameShadow(QFrame.Sunken)
+#        self.vLayout.addWidget(self.sepline)
+#        self.vLayout.setAlignment(self.sepline, Qt.AlignTop)
 # Driver Grid
         self.vLayout.addLayout(self.buildGrid())
 # Session Info
@@ -503,6 +539,7 @@ class RmsFrame(QFrame):
         self.racemode.setAlignment(Qt.AlignCenter)
         self.racemode.setStyleSheet("QLabel{ border-radius: 10px; background-color: grey; center; color: blue; font: 30pt}")
         self.vLayout.addWidget(self.racemode)
+        self.vLayout.setAlignment(self.racemode, Qt.AlignBottom)
 
     def buildGrid(self):
         self.mainLayout = QGridLayout()
@@ -523,8 +560,8 @@ class RmsFrame(QFrame):
         self.mainLayout.setColumnStretch(5, 3)
         self.mainLayout.setColumnStretch(6, 2)
         self.mainLayout.setColumnStretch(7, 1)
-
         return self.mainLayout
+
 
     def openCtrlDialog(self):
         self.ctrlDialog = CtrlDialog(self.driverArr)
@@ -547,6 +584,22 @@ class RmsFrame(QFrame):
             self.cu.start()
         else:
             self.setupRaceDlg.close()
+
+    def getColor(self):
+        if self.mainLayout.itemAtPosition(1, 1):
+            return self.mainLayout.itemAtPosition(1, 1).widget().palette().text()
+        else:
+            return None
+
+    def setColor(self, color):
+        PBwidget = self.mainLayout.itemAtPosition(1, 1).widget()
+        palette = PBwidget.palette()
+        palette.setColor(PBwidget.foregroundRole(), color)
+        PBwidget.setFlat(True)
+        PBwidget.setAutoFillBackground(True)
+        PBwidget.setPalette(palette)
+
+    color = pyqtProperty(QColor, getColor, setColor)
 
     def addDriver(self):
         driverRow = self.mainLayout.rowCount()
@@ -654,12 +707,31 @@ class RmsFrame(QFrame):
             driverButton.setText(self.driverChangeText[0] + '\n' + 'Ctrl: ' + str(driverObj.CtrlNum))
             driverObj.name = self.driverChangeText[0]
 
-    def updateDisplay(self):
+    def updateDisplay(self, binMode):
+        if binMode != None:
+            if binMode[2] == '1':
+                self.fuelmode.setText('Real')
+            elif binMode[3] == '1':
+                self.fuelmode.setText('On')
+            elif binMode[3] == '0':
+                self.fuelmode.setText('Off')
+            if binMode[1] == '1':
+                self.pitLaneStatus.setText('Exists')
+            else:
+                self.pitLaneStatus.setText('Missing')
+            if binMode[0] == '1':
+                self.lapCounter.setText('Exists')
+            else:
+                self.lapCounter.setText('Missing')
+
         driversInPlay = [driver for driver in self.driverArr if driver.time]
         if len(driversInPlay) + 1 > self.mainLayout.rowCount():
             self.addDriver()
         for pos, driver in enumerate(sorted(driversInPlay, key=posgetter), start=1):
             if pos == 1:
+#                if hasattr(self, 'leader') and self.leader != driver:
+                print('pos change')
+                self.animation.start()
                 self.leader = driver
                 t = formattime(driver.time - self.start, True)
             elif driver.lapcount == self.leader.lapcount:

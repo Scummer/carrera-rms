@@ -57,7 +57,7 @@ from PyQt5.QtGui import (
 
 from carreralib import ControlUnit
 
-import sys
+import sys, os
 
 def posgetter(driver):
     return (-driver.lapcount, driver.time)
@@ -443,14 +443,14 @@ class RmsFrame(QFrame):
         self.bestlaptime = {}
         self.fuelbar = {}
         self.pits = {}
-        QBAcolor = QByteArray()
-        QBAcolor.append('color')
-        self.animation = anim = QPropertyAnimation(self, QBAcolor, self)
-        anim.setDuration(250)
-        anim.setLoopCount(2)
-        anim.setStartValue(QColor(230,230, 0))
-        anim.setEndValue(QColor(0, 0, 0))
-        anim.setKeyValueAt(0.5, QColor(150,100,0))
+#        QBAcolor = QByteArray()
+#        QBAcolor.append('color')
+#        self.animation = anim = QPropertyAnimation(self, QBAcolor, self)
+#        anim.setDuration(250)
+#        anim.setLoopCount(2)
+#        anim.setStartValue(QColor(230,230, 0))
+#        anim.setEndValue(QColor(0, 0, 0))
+#        anim.setKeyValueAt(0.5, QColor(150,100,0))
 
     def buildframe(self):
         self.vLayout = QVBoxLayout(self)
@@ -729,9 +729,9 @@ class RmsFrame(QFrame):
             self.addDriver()
         for pos, driver in enumerate(sorted(driversInPlay, key=posgetter), start=1):
             if pos == 1:
-#                if hasattr(self, 'leader') and self.leader != driver:
-                print('pos change')
-                self.animation.start()
+                if hasattr(self, 'leader') and self.leader != driver:
+                    print('pos change')
+#                self.animation.start()
                 self.leader = driver
                 t = formattime(driver.time - self.start, True)
             elif driver.lapcount == self.leader.lapcount:

@@ -1,4 +1,26 @@
-How to get the rms.py to run:
+How to get the rms_UDP.py to run on Mac OS:
+
+Install all the dependencies:
+
+1. apt-get install libglib2.0-dev
+2. apt-get install python3-pip
+3. pip3 install carreralib
+4. pip3 install pyqt5
+5. Install the latest XCode
+
+Create a new project in XCode and add main.swift and ServerConnection.swift to the project
+Compile and start the Bluetooth Network Server
+Once you turn on the CU and it finds it, the BT server will automatically connect to it
+
+Run the rms.  It should establish a UDP connection to the Bluetooth server over UDP
+
+prompt>python3 rms_UDP.py
+
+The code itself is still pretty wild as this needed some reconfiguration from the Linux bluetooth version and 
+I was in the process of learning swift to get access to the bluetooth and network stack on a Mac with macOS 10.15
+
+
+How to get the rms.py to run on Linux:
 
 This is based on a Ubuntu Distribution
 

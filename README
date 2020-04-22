@@ -12,7 +12,7 @@ Create a new project in XCode and add main.swift and ServerConnection.swift to t
 Compile and start the Bluetooth Network Server
 Once you turn on the CU and it finds it, the BT server will automatically connect to it
 
-Run the rms.  It should establish a UDP connection to the Bluetooth server over UDP
+Run the rms.  It should establish a UDP connection to the Bluetooth server over UDP through the localhost interface on port 8888
 
 prompt>python3 rms_UDP.py
 

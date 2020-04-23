@@ -66,9 +66,15 @@ class btserver: NSObject {
         let payload = writeString.split(separator: "&")
         command = String(payload[0])
         var cudata: String = ""
+        if self.connectedPeripheral == nil {
+            cudata = "nocu"
+            self.connection?.send(data: cudata.data(using: .utf8)!)
+            return
+        }
         if let i = allowedCmds.firstIndex(where: {$0 == command}) {
             switch command {
             case "Version":
+                print("version query")
                 cudata = "0"
                 command = cudata
             case "Reset":
@@ -76,6 +82,8 @@ class btserver: NSObject {
             case "generalQuery":
                 cudata = "?"
                 command = cudata
+            case "clearCU":
+                cudata = "?"
             default:
                 break
             }
@@ -93,7 +101,7 @@ class btserver: NSObject {
                 writeType = .withoutResponse
             }
             connectedPeripheral?.writeValue(data, for: characteristic, type: writeType)
-//            printlog(characteristic, data: data)
+ //           printlog(characteristic, data: data)
         }
     }
     
@@ -202,10 +210,10 @@ extension btserver : CBPeripheralDelegate {
         }
     }
     
-    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
-        let writeString:Data? = "0".data(using: String.Encoding.ascii)
-        writeDataToSelectedCharacteristic(writeString!)
-    }
+//    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) //{
+      //  let writeString:Data? = "0".data(using: String.Encoding.ascii)
+       // writeDataToSelectedCharacteristic(writeString!)
+//    }
 }
 
 

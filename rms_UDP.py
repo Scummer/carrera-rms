@@ -81,7 +81,6 @@ def formattime(time, longfmt=False):
         return '0.0'
     s = time // 1000
     ms = time % 1000
-
     if not longfmt:
         return '%d.%03d' % (s, ms)
     elif s < 3600:
@@ -160,6 +159,7 @@ class Rms(QMainWindow):
     def __init__(self):
         super().__init__()
 
+        self.CUconnected = False
         self.shutdown = False
         if DoNotUseBt:
             self.connectBTudp()
@@ -244,35 +244,38 @@ class Rms(QMainWindow):
         print('new BT service')
         
     def connectBTudp(self):
-        self.CUconnected = False
         self.udpSocket = QUdpSocket()
         self.udpSocket.connectToHost(QHostAddress('127.0.0.1'), 8888)
         self.udpSocket.readyRead.connect(self.readUDP)
         self.startRMS(self.udpSocket)
-        self.CUconnected = True
         
     def readUDP(self):
         while self.udpSocket.hasPendingDatagrams():
             newDatagram = self.udpSocket.receiveDatagram()
+            if newDatagram.data() == "nocu":
+                print('No CU connected')
+                sys.exit()
             self.cu.receivedUDP(bytes(newDatagram.data()))
         
 
     def startRMS(self, device):
         print('start rms')
         self.cu = ControlUnit(device, timeout = 1.0)
-        self.cu.version()
-        self.initUI()
+        self.cu.request(b'Version')
 
     def setVersion(self, data):
         self.setWindowTitle('Race Management System V1.0   CU Version:' + str(data, 'utf-8'))
+        self.CUconnected = True
         
     def initUI(self):
+        self.last = None
         self.startLights = StartLights()
         rectDesktop = app.desktop().availableGeometry()
-        self.startLights.resize(rectDesktop.width()/2, (rectDesktop.width()/2)/5)
+        self.startLights.resize(int(rectDesktop.width()/2), int((rectDesktop.width()/2)/5))
         self.rmsframe = RmsFrame(self.cu)
         self.startLights.spacekey.activated.connect(self.rmsframe.racestart)
         self.setCentralWidget(self.rmsframe)
+        self.showMaximized()
    
     def run(self):
         self.last = None
@@ -295,7 +298,7 @@ class Rms(QMainWindow):
 
 
     def handle_status(self, status):
-        print('status data recv')
+#        print(status)
         if status.start > 0 and status.start <= 7:
             self.startLights.show()
             if status.start == 1 or status.start == 2:
@@ -328,12 +331,12 @@ class Rms(QMainWindow):
         self.status = status
 
     def handle_timer(self, timer):
-        print('timer data recv')
+#        print(timer)
         driver = self.rmsframe.driverArr[timer.address]
         driver.newlap(timer)
         if self.rmsframe.start is None:
             self.rmsframe.start = timer.timestamp
-        self.rmsframe.updateDisplay(None)
+        self.rmsframe.updateDisplay()
 
 class CtrlDialog(QDialog):
     def __init__(self, driverArr):
@@ -380,6 +383,9 @@ class RaceModeDialog(QDialog):
         self.setupUI()
     
     def setupUI(self):
+        self.qualiDataSet = False
+        self.practiceDataSet = False
+        self.raceDataSet = False
         self.vlayout = QVBoxLayout(self)
         self.selectRaceGroup = QGroupBox('Race')
         self.raceLayout = QHBoxLayout()
@@ -389,6 +395,7 @@ class RaceModeDialog(QDialog):
         self.selectRaceCombo.currentIndexChanged.connect(self.changeRaceMode)
         self.raceModeInput = QLineEdit()
         self.raceModeInput.setMaxLength(4)
+        self.raceModeInput.editingFinished.connect(self.raceDataEntered)
         self.raceModeLabel = QLabel()
         self.vlayout.addWidget(self.selectRaceGroup)
         self.raceLayout.addWidget(self.selectRaceCombo)
@@ -405,6 +412,7 @@ class RaceModeDialog(QDialog):
         self.practiceCombo.currentIndexChanged.connect(self.changePracticeMode)
         self.practiceInput = QLineEdit()
         self.practiceInput.setMaxLength(4)
+        self.practiceInput.editingFinished.connect(self.practiceDataEntered)
         self.practiceLabel = QLabel()
         self.practiceCombo.setCurrentIndex(1)
 
@@ -416,6 +424,7 @@ class RaceModeDialog(QDialog):
         self.qualiCombo.currentIndexChanged.connect(self.changeQualiMode)
         self.qualiInput = QLineEdit()       
         self.qualiInput.setMaxLength(4)
+        self.qualiInput.editingFinished.connect(self.qualiDataEntered)
         self.qualiLabel = QLabel()
         self.qualiCombo.setCurrentIndex(1)
 
@@ -448,16 +457,50 @@ class RaceModeDialog(QDialog):
         self.buttonLayout = QHBoxLayout()
         self.vlayout.addLayout(self.buttonLayout)
         self.buttonLayout.addWidget(self.startRaceBtn)
+        self.startRaceBtn.setEnabled(False)
         self.buttonLayout.addWidget(self.cancelBtn)
         
     def changeRaceMode(self, index):
         self.raceModeLabel.setText(self.labels[index + 1])
 
+    def practiceDataEntered(self):
+        self.practiceDataSet = False
+        if int(self.practiceInput.text()) > 0:
+            self.practiceDataSet = True
+        else:
+            self.practiceDataSet = False
+        self.checkRaceData()
+            
+    def qualiDataEntered(self):
+        self.qualiDataSet = False
+        if int(self.qualiInput.text()) > 0:
+            self.qualiDataSet = True
+        else:
+            self.qualiDataSet = False
+        self.checkRaceData()
+        
+    def raceDataEntered(self):
+        self.raceDataSet = False
+        if int(self.raceModeInput.text()) > 0:
+            self.raceDataSet = True
+        else:
+            self.raceDataSet = False
+        self.checkRaceData()
+            
+    def checkRaceData(self):
+        if self.qualiDataSet and self.practiceDataSet and self.raceDataSet:
+            self.startRaceBtn.setEnabled(True)
+        else:
+            self.startRaceBtn.setEnabled(False)
+        
     def practiceEnable(self, state):
         if state == Qt.Checked:
+            self.practiceDataSet = False
             self.practiceFrame.show()
         else:
+            self.practiceDataSet = True
             self.practiceFrame.hide()
+        self.checkRaceData()
 
     def changePracticeMode(self, index):
         if index == 0:
@@ -468,9 +511,12 @@ class RaceModeDialog(QDialog):
 
     def qualiEnable(self, state):
         if state == Qt.Checked:
+            self.qualiDataSet = False
             self.qualiFrame.show()
         else:
+            self.qualiDataSet = True
             self.qualiFrame.hide()
+        self.checkRaceData()
 
     def changeQualiMode(self, index):
         if index == 0:
@@ -647,7 +693,7 @@ class RmsFrame(QFrame):
             self.session.setRace(self.setupRaceDlg.getRaceModeInfo())
             self.racemode.setText(self.session.session + ' ' + str(self.session.amount) + ' ' + self.session.type)
             self.clearreason = 'start'
-            self.cu.request(b'clearCU')
+            self.clearCU()
         else:
             self.setupRaceDlg.close()
 
@@ -710,9 +756,10 @@ class RmsFrame(QFrame):
         self.mainLayout.addWidget(self.pits[driverRow], driverRow, 7)
 
     def racestart(self):
+        self.start = None
         self.cu.start()
-        self.mainLayout.itemAtPosition(1, 5).widget().setPits('Pit')
-        self.mainLayout.itemAtPosition(1, 5).widget().setPits('Track')
+#        self.mainLayout.itemAtPosition(1, 5).widget().setPits('Pit')
+#        self.mainLayout.itemAtPosition(1, 5).widget().setPits('Track')
 
     def resetRMS(self):
         if hasattr(self, 'driverArr'):
@@ -722,7 +769,7 @@ class RmsFrame(QFrame):
         self.driverArr = [RmsDriver(num) for num in range(1, 9)]
 
         self.clearreason = 'reset'
-        self.cu.request(b'clearCU')
+        self.clearCU()
 
         if hasattr(self, 'mainLayout'):
             while True: 
@@ -739,7 +786,7 @@ class RmsFrame(QFrame):
             self.vLayout.addWidget(self.racemode)
             self.vLayout.setAlignment(self.racemode, Qt.AlignBottom)
 
-    def clearCU(self, status):
+    def clearCU(self, status = None):
         # discard remaining timer messages
         if not isinstance(status, ControlUnit.Status):
             self.cu.request(b'clearCU')
@@ -749,6 +796,8 @@ class RmsFrame(QFrame):
                 self.cu.reset()
             elif self.clearreason == 'start':
                 self.cu.start()
+            else:
+                self.cu.request()
 
     def pressCode(self):
         print('press Code')
@@ -776,7 +825,7 @@ class RmsFrame(QFrame):
             driverButton.setText(self.driverChangeText[0] + '\n' + 'Ctrl: ' + str(driverObj.CtrlNum))
             driverObj.name = self.driverChangeText[0]
 
-    def updateDisplay(self, binMode):
+    def updateDisplay(self, binMode = None):
         if binMode != None:
             if binMode[2] == '1':
                 self.fuelmode.setText('Real')
@@ -792,7 +841,6 @@ class RmsFrame(QFrame):
                 self.lapCounter.setText('Exists')
             else:
                 self.lapCounter.setText('Missing')
-        print(self.mainLayout.rowCount())
         driversInPlay = [driver for driver in self.driverArr if driver.time]
         if len(driversInPlay) + 1 > self.mainLayout.rowCount():
             self.addDriver()
@@ -802,7 +850,10 @@ class RmsFrame(QFrame):
                     print('pos change')
 #                self.animation.start()
                 self.leader = driver
-                t = formattime(driver.time - self.start, True)
+                if self.start is None:
+                    t = "0.0"
+                else:
+                    t = formattime(driver.time - self.start, True)
             elif driver.lapcount == self.leader.lapcount:
                 t = '+%ss' % formattime(driver.time - self.leader.time)
             else:
@@ -818,25 +869,25 @@ class RmsFrame(QFrame):
                 self.fuelbar[pos].setStyleSheet("QProgressBar{ color: white; background-color: black; border: 5px solid black; border-radius: 10px; text-align: center}\
                                                  QProgressBar::chunk { background: qlineargradient(x1: 1, y1: 0.5, x2: 0, y2: 0.5, stop: 0 #00AA00, stop: " + str(0.92 - (1 / (driver.fuellevel))) + " #22FF22, stop: " + str(0.921 - (1 / (driver.fuellevel))) + " #22FF22, stop: " + str(1.001 - (1 / (driver.fuellevel))) + " red, stop: 1 #550000); }")
             self.pits[pos].display(driver.pitcount)
-        if hasattr(self, 'leader') and self.session.session != None:
+        if hasattr(self, 'leader') and self.session.session is not None and self.start is not None:
             if self.session.type != None:
                 self.racemode.setText(self.session.session + ' ' + str(self.session.amount) + ' ' + self.session.type)
             if self.session.type == 'Laps':
                 if self.leader.lapcount > self.session.amount:
-                    self.racestart()
-                    self.session.saveSessionData(driversInPlay)
-                    self.clearCU()
-                    self.session.sessionOver()
+                    self.stopSession(driversInPlay, self.start)
             elif self.session.type == 'Timed':
                 if self.leader.time - self.start > self.session.amount * 60000:
-                    self.racestart()
-                    self.session.saveSessionData(driversInPlay)
-                    self.clearCU()
-                    self.session.sessionOver()
-            elif self.session.type == None:
+                    self.stopSession(driversInPlay, self.start)
+            if self.session.type == None:
                 self.session.session = None
                 self.showLeaderboard()
 
+    def stopSession(self, driversInPlay, start):
+        self.racestart()
+        self.session.saveSessionData(driversInPlay, start)
+        self.clearCU()
+        self.session.sessionOver()
+        
     def showLeaderboard(self):
         self.leaderBoard = LBDialog(self.session.leaderboard)
         self.leaderBoard.show()
@@ -872,14 +923,14 @@ class RaceSession(QObject):
                 self.type = None
                 self.session = 'Race Finished'
 
-    def saveSessionData(self, driverArr):
+    def saveSessionData(self, driverArr, start):
         if self.sessionSteps[self.currentStep] == 'Qualification':
             self.showStartRanking = StartRankDialog(driverArr)
             self.showStartRanking.exec_()
 
         self.leaderboard[self.sessionSteps[self.currentStep]] = []
         for driver in sorted(driverArr, key=posgetter):
-            self.leaderboard[self.sessionSteps[self.currentStep]].append({'laps': driver.lapcount, 'total': driver.time,\
+            self.leaderboard[self.sessionSteps[self.currentStep]].append({'laps': driver.lapcount, 'total': driver.time - start,\
                      'best': driver.bestLapTime, 'pits': driver.pitcount, 'name': driver.name})
             driver.bestLapTime = None
             driver.time = None
@@ -967,14 +1018,14 @@ class RmsDriver(QObject):
         self.lapCountLCD.setPalette(lcdPalette)
         self.lapCountLCD.display(self.lapcount)
 
-        self.bestLapLCD = QLCDNumber()
+        self.bestLapLCD = QLCDNumber(6)
         self.bestLapLCD.setStyleSheet("QLCDNumber{ border-radius: 10px; background-color: black}")
         lcdPalette = self.bestLapLCD.palette()
         lcdPalette.setColor(lcdPalette.WindowText, QColor(255, 255, 0))
         self.bestLapLCD.setPalette(lcdPalette)
         self.bestLapLCD.display(self.bestLapTime)
 
-        self.lapLCD = QLCDNumber()
+        self.lapLCD = QLCDNumber(6)
         self.lapLCD.setStyleSheet("QLCDNumber{ border-radius: 10px; background-color: black}")
         lcdPalette = self.lapLCD.palette()
         lcdPalette.setColor(lcdPalette.WindowText, QColor(255, 255, 0))
@@ -1107,6 +1158,8 @@ class ControlUnit(QObject):
             logger.debug('Connecting to %s', device)
             self.__connection = connection.open(device, **kwargs)
             logger.debug('Connection established')
+        self.requestsent = None
+        self.stoprequest = False
             
     def close(self):
         """Close the connection to the CU."""
@@ -1127,11 +1180,25 @@ class ControlUnit(QObject):
         :class:`ControlUnit.Timer` or :class:`ControlUnit.Status`,
         depending on whether any timer events are pending.
         """
+        if buf.startswith(b'T'):
+            self.stoprequest = True
+            while self.requestsent:
+                app.processEvents()
+            self.__connection.write(buf)
+            return
         logger.debug('Sending message %r', buf)
         self.__connection.write(buf)
+        self.requestsent = True
         
     def receivedUDP(self, udpData):
-        if udpData.startswith(b'?:'):
+ #       print(udpData)
+        self.requestsent = False
+        if self.stoprequest and not udpData.startswith(b'T'):
+            return
+        if udpData.startswith(b'T') or udpData.startswith(b'?T'):
+            self.request()
+            self.stoprequest = False
+        elif udpData.startswith(b'?:'):
             # recent CU versions report two extra unknown bytes with '?:'
             try:
                 parts = protocol.unpack('2x8YYYBYC', udpData)
@@ -1141,14 +1208,18 @@ class ControlUnit(QObject):
             pit = tuple(pitmask & (1 << n) != 0 for n in range(8))
             custat = ControlUnit.Status(fuel, start, mode, pit, display)
             w.handle_data(custat)
+        elif udpData.startswith(b'Reset&:') or udpData.startswith(b'?='):
+            if udpData.startswith(b'Reset'):
+                self.request()
+            else:
+                w.run()
         elif udpData.startswith(b'?'):
-            print(udpData)
             address, timestamp, sector = protocol.unpack('xYIYC', udpData)
             cutimer = ControlUnit.Timer(address - 1, timestamp, sector)
-            print(cutimer)
             w.handle_data(cutimer)
         elif udpData.startswith(b'0'):
             w.setVersion(protocol.unpack('x4sC', udpData)[0])
+            w.initUI()
         elif udpData.startswith(b'clearCU'):
             cudata = str(udpData, 'utf-8').split('&')[1]
             if cudata.startswith(':'):
@@ -1164,7 +1235,6 @@ class ControlUnit(QObject):
             else:
                 self.request(b'clearCU')
         else:
-            print(udpData)
             self.request()
                     
     def reset(self):
@@ -1217,21 +1287,12 @@ class ControlUnit(QObject):
         return self.request(buf)
 
     def start(self):
-        """Initiate the CU start sequence."""
         self.request(self.START_KEY)
 
-    def version(self):
-        """Retrieve the CU version."""
-        self.request(b'Version')
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
     w = Rms()
-    if (w.CUconnected):
-        w.showMaximized()
-        w.run()
-    else:
-        print('No CU found')
-        sys.exit()
+    
     sys.exit(app.exec_())

@@ -2,7 +2,7 @@ How to get the rms_UDP.py to run on Mac OS:
 
 Install all the dependencies:
 
-1. Download and install the latest python Version from python.org for OS X  I used 3.8.2 to develop the app.
+1. Download and install the latest python Version from python.org for OS X. I used 3.8.2 to develop the app.
 2. pip3 install carreralib
 3. pip3 install pyqt5
 4. Install the latest XCode

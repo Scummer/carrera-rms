@@ -9,6 +9,7 @@
 import CoreBluetooth
 import Network
 
+@available(OSX 10.14, *)
 class btserver: NSObject {
     let btscanner = Scanner()
     var listUpdateTimer:Timer? = nil
@@ -133,6 +134,7 @@ extension Data {
     }
 }
 
+@available(OSX 10.14, *)
 extension btserver : CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         print((peripheral.name ?? "") + ":\n connected")
@@ -173,7 +175,7 @@ extension btserver : CBCentralManagerDelegate {
     
 }
 
-
+@available(OSX 10.14, *)
 extension btserver : CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         if let services = peripheral.services {
@@ -291,7 +293,7 @@ func += <KeyType, ValueType> (left: inout Dictionary<KeyType, ValueType>, right:
     }
 }
 
-if #available(macOS 10.14, *) {
+if #available(OSX 10.14, *) {
     btserver()
     RunLoop.main.run()
 }

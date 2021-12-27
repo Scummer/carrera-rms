@@ -9,7 +9,7 @@
 import Foundation
 import Network
 
-@available(macOS 10.14, *)
+@available(OSX 10.14, *)
 class ServerConnection {
     //The TCP maximum package size is 64K 65536
     let MTU = 65536
